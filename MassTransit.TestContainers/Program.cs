@@ -1,5 +1,7 @@
-﻿using Azure.Messaging.ServiceBus.Administration;
+﻿using Azure.Messaging.ServiceBus;
+using Azure.Messaging.ServiceBus.Administration;
 using MassTransit;
+using MassTransit.AzureServiceBusTransport;
 using MassTransit.TestContainers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -16,12 +18,24 @@ var serviceBusContainer = new ServiceBusBuilder("mcr.microsoft.com/azure-messagi
     .Build();
 await serviceBusContainer.StartAsync();
 
-Console.WriteLine($"Service Bus connection string: {serviceBusContainer.GetConnectionString()}");
-Console.WriteLine($"Service Bus connection string: {serviceBusContainer.GetHttpConnectionString()}");
-
-
 var connectionString = serviceBusContainer.GetConnectionString();
 var httpConnectionString = serviceBusContainer.GetHttpConnectionString();
+
+Console.WriteLine($"Service Bus connection string: {connectionString}");
+Console.WriteLine($"Service Bus HTTP connection string: {httpConnectionString}");
+
+var properties = ServiceBusConnectionStringProperties.Parse(httpConnectionString);
+Environment.SetEnvironmentVariable("EMULATOR_HTTP_PORT", properties.Endpoint.Port.ToString());
+Console.WriteLine($"EMULATOR_HTTP_PORT: {Environment.GetEnvironmentVariable("EMULATOR_HTTP_PORT")}");
+
+httpConnectionString = httpConnectionString.Replace("127.0.0.1", "localhost");
+connectionString = connectionString.Replace("127.0.0.1", "localhost").Replace("amqp", "sb");
+Console.WriteLine($"Updated Service Bus connection string: {connectionString}");
+Console.WriteLine($"Updated Service Bus HTTP connection string: {httpConnectionString}");
+
+Defaults.DefaultMessageTimeToLive = TimeSpan.FromHours(1);
+Defaults.BasicMessageTimeToLive = TimeSpan.FromHours(1);
+Defaults.AutoDeleteOnIdle = TimeSpan.FromHours(1);
 
 var admin = new ServiceBusAdministrationClient(httpConnectionString);
 var queue = await admin.CreateQueueAsync("test-queue");
@@ -35,9 +49,10 @@ var subscription = await admin.CreateSubscriptionAsync(new CreateSubscriptionOpt
 builder.Services.AddMassTransit(c =>
 {
     c.AddConsumer<TestConsumer>();
-    c.UsingAzureServiceBus((_, cc) =>
+    c.UsingAzureServiceBus((context, cc) =>
     {
         cc.Host(connectionString);
+        cc.ConfigureEndpoints(context);
     });
 });
 
@@ -48,19 +63,24 @@ await host.StartAsync();
 var loggerFactory = host.Services.GetRequiredService<ILoggerFactory>();
 var logger = loggerFactory.CreateLogger<Program>();
 
-await TopologyPrinter.PrintTopologyAsync(loggerFactory, httpConnectionString);
+//await TopologyPrinter.PrintTopologyAsync(loggerFactory, httpConnectionString);
+
+logger.LogInformation("Starting the bus");
+var busControl = host.Services.GetRequiredService<IBusControl>();
+await busControl.StartAsync(TimeSpan.FromSeconds(20));
 
 logger.LogInformation("Publish test message");
-var bus = host.Services.GetRequiredService<IBus>();
-await bus.Publish(new TestMessage
+var publishEndpoint = host.Services.GetRequiredService<IPublishEndpoint>();
+await publishEndpoint.Publish(new TestMessage
 {
     Text = "Hello!"
 });
 
+
 logger.LogInformation("Waiting...");
 await Task.Delay(TimeSpan.FromSeconds(10));
 
-await TopologyPrinter.PrintTopologyAsync(loggerFactory, httpConnectionString);
+//await TopologyPrinter.PrintTopologyAsync(loggerFactory, httpConnectionString);
 
 Console.ReadKey(intercept: true);
 
