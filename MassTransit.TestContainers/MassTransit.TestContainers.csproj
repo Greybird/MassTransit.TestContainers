@@ -12,8 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Azure.Messaging.ServiceBus" Version="7.20.1" />
-    <PackageReference Include="MassTransit.Azure.ServiceBus.Core" Version="9.1.0" />
+    <PackageReference Include="MassTransit.Azure.ServiceBus.Core" Version="9.0.1" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.5" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.5" />
     <PackageReference Include="Testcontainers.ServiceBus" Version="4.11.0" />
