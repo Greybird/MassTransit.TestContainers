@@ -1,0 +1,15 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Azure/azure-service-bus-emulator-installer/main/ServiceBus-Emulator/Schema/Config-schema.json",
+  "UserConfig": {
+    "Namespaces": [
+      {
+        "Name": "sbemulatorns",
+        "Queues": [],
+        "Topics": []
+      }
+    ],
+    "Logging": {
+      "Type": "Console"
+    }
+  }
+}
